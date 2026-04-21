@@ -1,0 +1,69 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared config — served to every microservice by Config Server
+# Place service-specific overrides in: user-service.yml, order-service.yml, etc.
+# ─────────────────────────────────────────────────────────────────────────────
+
+jwt:
+  secret: ecommerce-super-secret-jwt-key-at-least-256-bits-long-for-hs256
+  expiration: 86400000   # 24 hours in ms
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics,prometheus,loggers"
+
+  endpoint:
+    health:
+      show-details: always
+
+  tracing:
+    sampling:
+      probability: 1.0
+
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+spring:
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+logging:
+  level:
+    root: INFO
+    com.ecommerce: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN

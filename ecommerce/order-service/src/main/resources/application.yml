@@ -1,0 +1,100 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: order-service
+
+  config:
+    import: optional:configserver:http://configuser:configpassword@config-server:8888
+
+  datasource:
+    url: jdbc:mysql://mysql-orders:3306/ecommerce_orders?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        acknowledge-mode: manual
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+feign:
+  client:
+    config:
+      default:
+        connect-timeout: 5000
+        read-timeout: 10000
+        logger-level: basic
+
+  circuitbreaker:
+    enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      product-service:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+
+      payment-service:
+        slidingWindowSize: 5
+        failureRateThreshold: 30
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 2
+
+  retry:
+    instances:
+      product-service:
+        max-attempts: 3
+        wait-duration: 1s
+
+      payment-service:
+        max-attempts: 2
+        wait-duration: 2s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+  tracing:
+    sampling:
+      probability: 1.0
+
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    com.ecommerce: DEBUG
+    feign: DEBUG

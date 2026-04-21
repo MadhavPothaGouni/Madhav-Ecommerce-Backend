@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name"/>
+
+    <!-- Console appender for local dev -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Logstash TCP appender for ELK -->
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>localhost:5000</destination>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"app":"${APP_NAME}","env":"${SPRING_PROFILES_ACTIVE:-local}"}</customFields>
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+        </encoder>
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+    </appender>
+
+    <!-- Async wrapper for Logstash to avoid blocking -->
+    <appender name="ASYNC_LOGSTASH" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="LOGSTASH"/>
+        <neverBlock>true</neverBlock>
+        <queueSize>512</queueSize>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_LOGSTASH"/>
+    </root>
+
+    <logger name="com.ecommerce" level="DEBUG"/>
+    <logger name="org.springframework.web" level="INFO"/>
+</configuration>

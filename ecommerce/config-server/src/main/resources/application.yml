@@ -1,0 +1,36 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+
+  security:
+    user:
+      name: configuser
+      password: configpassword
+
+  profiles:
+    active: native                   # use local filesystem, NOT Git
+
+  cloud:
+    config:
+      server:
+        native:
+          search-locations:
+            - classpath:/config      # reads from config-server/src/main/resources/config/
+        health:
+          enabled: false             # disables health check that tries to clone Git repo
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.config: INFO

@@ -1,0 +1,293 @@
+networks:
+  ecommerce-net:
+    driver: bridge
+
+volumes:
+  mysql_users_data:
+  mysql_products_data:
+  mysql_orders_data:
+  mysql_payments_data:
+  mysql_notifications_data:
+  redis_data:
+  rabbitmq_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+  zipkin_data:
+
+services:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # INFRASTRUCTURE
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  mysql-users:
+    image: mysql:8.0
+    container_name: mysql-users
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce_users
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_users_data:/var/lib/mysql
+    networks:
+      - ecommerce-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-products:
+    image: mysql:8.0
+    container_name: mysql-products
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce_products
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_products_data:/var/lib/mysql
+    networks:
+      - ecommerce-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-orders:
+    image: mysql:8.0
+    container_name: mysql-orders
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce_orders
+    ports:
+      - "3309:3306"
+    volumes:
+      - mysql_orders_data:/var/lib/mysql
+    networks:
+      - ecommerce-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-payments:
+    image: mysql:8.0
+    container_name: mysql-payments
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce_payments
+    ports:
+      - "3310:3306"
+    volumes:
+      - mysql_payments_data:/var/lib/mysql
+    networks:
+      - ecommerce-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-notifications:
+    image: mysql:8.0
+    container_name: mysql-notifications
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce_notifications
+    ports:
+      - "3311:3306"
+    volumes:
+      - mysql_notifications_data:/var/lib/mysql
+    networks:
+      - ecommerce-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-net
+    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ecommerce-net
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - ecommerce-net
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: logstash
+    ports:
+      - "5000:5000/tcp"
+      - "5001:5001/udp"
+      - "9600:9600"
+    volumes:
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    networks:
+      - ecommerce-net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+      XPACK_SECURITY_ENABLED: "false"
+    networks:
+      - ecommerce-net
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - ecommerce-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - ecommerce-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - ecommerce-net
+
+  config-server:
+    build:
+      context: ./config-server
+      dockerfile: Dockerfile
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    networks:
+      - ecommerce-net
+
+  eureka-server:
+    build:
+      context: ./eureka-server
+      dockerfile: Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - ecommerce-net
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    networks:
+      - ecommerce-net
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    networks:
+      - ecommerce-net
+
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    container_name: product-service
+    ports:
+      - "8082:8082"
+    networks:
+      - ecommerce-net
+
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    ports:
+      - "8083:8083"
+    networks:
+      - ecommerce-net
+
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    ports:
+      - "8084:8084"
+    networks:
+      - ecommerce-net
+
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "8085:8085"
+    networks:
+      - ecommerce-net
